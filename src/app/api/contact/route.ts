@@ -49,9 +49,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Monta os anexos para o Resend
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resendAttachments = attachments.map((file: any) => ({
       filename: file.name,
-      content: file.content, // base64 string
+      content: file.content,
       type: file.type,
       disposition: 'attachment',
     }));
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ message: 'E-mail enviado com sucesso!' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     return NextResponse.json(
       { error: 'Erro ao enviar o e-mail.' },
