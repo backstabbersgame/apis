@@ -1,20 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://solarastudios.com.br',
+];
+
+const getCorsHeaders = (origin: string | null): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Methods': 'POST',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+
+  if (origin && allowedOrigins.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+
+  return headers;
+};
+
 const resendApiKey = process.env.RESEND_API_KEY;
 const receiver =
   process.env.CONTACT_RECEIVER_EMAIL || 'contato@solarastudios.com.br';
 
-if (!resendApiKey) {
-  throw new Error('RESEND_API_KEY não definida!');
-}
-if (!receiver) {
-  throw new Error('CONTACT_RECEIVER_EMAIL não definida!');
-}
-
-const resend = new Resend(resendApiKey);
-
 export async function POST(req: NextRequest) {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  if (!resendApiKey) {
+    return new NextResponse('RESEND_API_KEY não definida!', {
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+
+  if (!receiver) {
+    return new NextResponse('CONTACT_RECEIVER_EMAIL não definida!', {
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+
+  const resend = new Resend(resendApiKey);
+
   try {
     const body = await req.json();
     const {
@@ -26,24 +54,23 @@ export async function POST(req: NextRequest) {
       attachments = [],
     } = body;
 
-    // Validações básicas
     if (!name || !email || !message) {
       return NextResponse.json(
         { error: 'Campos obrigatórios ausentes.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
     if (attachments.length > 5) {
       return NextResponse.json(
         { error: 'Máximo de 5 arquivos permitidos.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
     for (const file of attachments) {
       if (file.size > 1 * 1024 * 1024) {
         return NextResponse.json(
           { error: 'Cada arquivo deve ter no máximo 1MB.' },
-          { status: 400 }
+          { status: 400, headers: corsHeaders }
         );
       }
     }
@@ -71,12 +98,15 @@ export async function POST(req: NextRequest) {
       attachments: resendAttachments,
     });
 
-    return NextResponse.json({ message: 'E-mail enviado com sucesso!' });
+    return NextResponse.json(
+      { message: 'E-mail enviado com sucesso!' },
+      { status: 200, headers: corsHeaders }
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     return NextResponse.json(
       { error: 'Erro ao enviar o e-mail.' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
