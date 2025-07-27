@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { limiter } from '../../utils/rate-limit';
 
 const allowedOrigins = [
-  'http://localhost:3000',
+  process.env.API_URL_DEV,
   'https://solarastudios.com.br',
 ];
 
@@ -27,6 +28,21 @@ const receiver =
 export async function POST(req: NextRequest) {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
+
+  try {
+    await limiter.checkNext(req, 5);
+  } catch {
+    return NextResponse.json(
+      {
+        error: 'Muitas requisições. Tente novamente em breve.',
+      },
+      {
+        status: 429,
+        headers: corsHeaders,
+      }
+    );
+  }
+
   if (!resendApiKey) {
     return new NextResponse('RESEND_API_KEY não definida!', {
       status: 500,
@@ -45,6 +61,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    console.log({ body });
     const {
       name,
       email,
@@ -86,7 +103,7 @@ export async function POST(req: NextRequest) {
 
     // Envia o e-mail via Resend
     await resend.emails.send({
-      from: `Contato site <contato-site@solarastudios.com.br>`,
+      from: `Contato Solara Studios <contato-site@solarastudios.com.br>`,
       replyTo: email,
       to: receiver,
       subject,
@@ -109,4 +126,14 @@ export async function POST(req: NextRequest) {
       { status: 500, headers: corsHeaders }
     );
   }
+}
+
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
 }
